@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {CoverageMapData} from 'istanbul-lib-coverage';
+import type {CoverageMapData} from 'istanbul-lib-coverage';
 
 export type DoneFn = (reason?: string | Error) => void;
 export type TestName = string;
@@ -83,8 +83,10 @@ export interface GlobalAdditions {
   spyOn: () => void;
   spyOnProperty: () => void;
 }
-export interface Global
-  extends GlobalAdditions,
-    Omit<NodeJS.Global, keyof GlobalAdditions> {
+
+// extends directly after https://github.com/sandersn/downlevel-dts/issues/33 is fixed
+type NodeGlobalWithoutAdditions = Omit<NodeJS.Global, keyof GlobalAdditions>;
+
+export interface Global extends GlobalAdditions, NodeGlobalWithoutAdditions {
   [extras: string]: any;
 }

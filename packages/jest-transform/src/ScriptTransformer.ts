@@ -7,7 +7,7 @@
 
 import {createHash} from 'crypto';
 import * as path from 'path';
-import {Config} from '@jest/types';
+import type {Config} from '@jest/types';
 import {createDirectory, interopRequireDefault, isPromise} from 'jest-util';
 import * as fs from 'graceful-fs';
 import {transformSync as babelTransform} from '@babel/core';
@@ -20,7 +20,7 @@ import slash = require('slash');
 import {sync as writeFileAtomic} from 'write-file-atomic';
 import {sync as realpath} from 'realpath-native';
 import {addHook} from 'pirates';
-import {
+import type {
   Options,
   TransformResult,
   TransformedSource,
@@ -191,12 +191,8 @@ export default class ScriptTransformer {
     return transform;
   }
 
-  private _instrumentFile(
-    filename: Config.Path,
-    input: TransformedSource,
-    canMapToInput: boolean,
-  ): TransformedSource {
-    const result = babelTransform(input.code, {
+  private _instrumentFile(filename: Config.Path, content: string): string {
+    const result = babelTransform(content, {
       auxiliaryCommentBefore: ' istanbul ignore next ',
       babelrc: false,
       caller: {
@@ -214,27 +210,21 @@ export default class ScriptTransformer {
             cwd: this._config.rootDir,
             exclude: [],
             extension: false,
-            // Needed for correct coverage as soon as we start storing a source map of the instrumented code
-            inputSourceMap: input.map,
             useInlineSourceMaps: false,
           },
         ],
       ],
-      /**
-       * It's necessary to be able to map back to original source from the instrumented code.
-       * The inline map is needed for debugging functionality, and exposing it as a separate file is needed
-       * for mapping stack traces. It's convenient to use 'both' here and avoid extracting the source map.
-       *
-       * Previous behavior of emitting no map when we can't map back to original source is preserved.
-       */
-      sourceMaps: canMapToInput ? 'both' : false,
     });
 
-    if (result && result.code) {
-      return result as TransformResult;
+    if (result) {
+      const {code} = result;
+
+      if (code) {
+        return code;
+      }
     }
 
-    return {code: input.code};
+    return content;
   }
 
   private _getRealPath(filepath: Config.Path): Config.Path {
@@ -328,36 +318,17 @@ export default class ScriptTransformer {
       }
     }
 
-    // Apply instrumentation to the code if necessary, keeping the instrumented code and new map
-    let map = transformed.map;
     if (!transformWillInstrument && instrument) {
-      /**
-       * We can map the original source code to the instrumented code ONLY if
-       * - the process of transforming the code produced a source map e.g. ts-jest
-       * - we did not transform the source code
-       *
-       * Otherwise we cannot make any statements about how the instrumented code corresponds to the original code,
-       * and we should NOT emit any source maps
-       *
-       */
-      const shouldEmitSourceMaps = (!!transform && !!map) || !transform;
-      const instrumented = this._instrumentFile(
-        filename,
-        transformed,
-        shouldEmitSourceMaps,
-      );
-      code = instrumented.code;
-
-      if (instrumented.map) {
-        map = instrumented.map;
-      }
+      code = this._instrumentFile(filename, transformed.code);
     } else {
       code = transformed.code;
     }
 
-    if (map) {
+    if (transformed.map) {
       const sourceMapContent =
-        typeof map === 'string' ? map : JSON.stringify(map);
+        typeof transformed.map === 'string'
+          ? transformed.map
+          : JSON.stringify(transformed.map);
       writeCacheFile(sourceMapPath, sourceMapContent);
     } else {
       sourceMapPath = null;
@@ -599,9 +570,7 @@ const stripShebang = (content: string) => {
  * could get corrupted, out-of-sync, etc.
  */
 function writeCodeCacheFile(cachePath: Config.Path, code: string) {
-  const checksum = createHash('md5')
-    .update(code)
-    .digest('hex');
+  const checksum = createHash('md5').update(code).digest('hex');
   writeCacheFile(cachePath, checksum + '\n' + code);
 }
 
@@ -617,9 +586,7 @@ function readCodeCacheFile(cachePath: Config.Path): string | null {
     return null;
   }
   const code = content.substr(33);
-  const checksum = createHash('md5')
-    .update(code)
-    .digest('hex');
+  const checksum = createHash('md5').update(code).digest('hex');
   if (checksum === content.substr(0, 32)) {
     return code;
   }
@@ -634,7 +601,7 @@ function readCodeCacheFile(cachePath: Config.Path): string | null {
  */
 const writeCacheFile = (cachePath: Config.Path, fileData: string) => {
   try {
-    writeFileAtomic(cachePath, fileData, {encoding: 'utf8'});
+    writeFileAtomic(cachePath, fileData, {encoding: 'utf8', fsync: false});
   } catch (e) {
     if (cacheWriteErrorSafeToIgnore(e, cachePath)) {
       return;

@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {RawSourceMap} from 'source-map';
-import {Config} from '@jest/types';
+import type {RawSourceMap} from 'source-map';
+import type {Config} from '@jest/types';
 
 export type ShouldInstrumentOptions = Pick<
   Config.GlobalConfig,
@@ -24,15 +24,17 @@ export type Options = ShouldInstrumentOptions &
     isInternalModule: boolean;
   }>;
 
+// extends directly after https://github.com/sandersn/downlevel-dts/issues/33 is fixed
+type SourceMapWithVersion = Omit<RawSourceMap, 'version'>;
+
 // This is fixed in source-map@0.7.x, but we can't upgrade yet since it's async
-interface FixedRawSourceMap extends Omit<RawSourceMap, 'version'> {
+interface FixedRawSourceMap extends SourceMapWithVersion {
   version: number;
 }
 
-export type TransformedSource = {
-  code: string;
-  map?: FixedRawSourceMap | string | null;
-};
+export type TransformedSource =
+  | {code: string; map?: FixedRawSourceMap | string | null}
+  | string;
 
 export type TransformResult = {
   code: string;
@@ -67,5 +69,5 @@ export interface Transformer {
     sourcePath: Config.Path,
     config: Config.ProjectConfig,
     options?: TransformOptions,
-  ) => string | TransformedSource;
+  ) => TransformedSource;
 }

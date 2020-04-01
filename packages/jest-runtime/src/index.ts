@@ -9,15 +9,15 @@ import {URL, fileURLToPath} from 'url';
 import * as path from 'path';
 import {Script, compileFunction} from 'vm';
 import * as nativeModule from 'module';
-import {Config} from '@jest/types';
-import {
+import type {Config} from '@jest/types';
+import type {
   Jest,
   JestEnvironment,
   LocalModuleRequire,
   Module,
   ModuleWrapper,
 } from '@jest/environment';
-import {SourceMapRegistry} from '@jest/source-map';
+import type {SourceMapRegistry} from '@jest/source-map';
 import {formatStackTrace, separateMessageFromStack} from 'jest-message-util';
 import {createDirectory, deepCyclicCopy} from 'jest-util';
 import {escapePathForRegex} from 'jest-regex-util';
@@ -29,13 +29,13 @@ import {
   handlePotentialSyntaxError,
   shouldInstrument,
 } from '@jest/transform';
-import {V8CoverageResult} from '@jest/test-result';
+import type {V8CoverageResult} from '@jest/test-result';
 import {CoverageInstrumenter, V8Coverage} from 'collect-v8-coverage';
 import * as fs from 'graceful-fs';
 import {run as cliRun} from './cli';
 import {options as cliOptions} from './cli/args';
 import {findSiblingsWithFileExtension} from './helpers';
-import {Context as JestContext} from './types';
+import type {Context as JestContext} from './types';
 import jestMock = require('jest-mock');
 import HasteMap = require('jest-haste-map');
 import Resolver = require('jest-resolve');
@@ -64,6 +64,8 @@ type CacheFS = {[path: string]: string};
 
 namespace Runtime {
   export type Context = JestContext;
+  // ditch this export when moving to esm - for now we need it for to avoid faulty type elision
+  export type RuntimeType = Runtime;
 }
 
 const testTimeoutSymbol = Symbol.for('TEST_TIMEOUT_SYMBOL');
@@ -122,6 +124,7 @@ class Runtime {
   private _transitiveShouldMock: BooleanObject;
   private _unmockList: RegExp | undefined;
   private _virtualMocks: BooleanObject;
+  private _moduleImplementation?: typeof nativeModule.Module;
 
   constructor(
     config: Config.ProjectConfig,
@@ -510,16 +513,23 @@ class Runtime {
         return this.requireModule(from, moduleName);
       }
     } catch (e) {
-      if (e.code === 'MODULE_NOT_FOUND') {
-        const appendedMessage = findSiblingsWithFileExtension(
-          this._config.moduleFileExtensions,
-          from,
-          moduleName,
-        );
-
-        if (appendedMessage) {
-          e.message += appendedMessage;
+      const moduleNotFound = Resolver.tryCastModuleNotFoundError(e);
+      if (moduleNotFound) {
+        if (
+          moduleNotFound.siblingWithSimilarExtensionFound === null ||
+          moduleNotFound.siblingWithSimilarExtensionFound === undefined
+        ) {
+          moduleNotFound.hint = findSiblingsWithFileExtension(
+            this._config.moduleFileExtensions,
+            from,
+            moduleNotFound.moduleName || moduleName,
+          );
+          moduleNotFound.siblingWithSimilarExtensionFound = Boolean(
+            moduleNotFound.hint,
+          );
         }
+        moduleNotFound.buildMessage(this._config.rootDir);
+        throw moduleNotFound;
       }
       throw e;
     }
@@ -841,28 +851,32 @@ class Runtime {
       return;
     }
 
-    compiledFunction.call(
-      localModule.exports,
-      localModule as NodeModule, // module object
-      localModule.exports, // module exports
-      localModule.require as typeof require, // require implementation
-      dirname, // __dirname
-      filename, // __filename
-      this._environment.global, // global object
-      this._createJestObjectFor(
-        filename,
-        localModule.require as LocalModuleRequire,
-      ), // jest object
-      ...this._config.extraGlobals.map(globalVariable => {
-        if (this._environment.global[globalVariable]) {
-          return this._environment.global[globalVariable];
-        }
+    try {
+      compiledFunction.call(
+        localModule.exports,
+        localModule as NodeModule, // module object
+        localModule.exports, // module exports
+        localModule.require as typeof require, // require implementation
+        dirname, // __dirname
+        filename, // __filename
+        this._environment.global, // global object
+        this._createJestObjectFor(
+          filename,
+          localModule.require as LocalModuleRequire,
+        ), // jest object
+        ...this._config.extraGlobals.map(globalVariable => {
+          if (this._environment.global[globalVariable]) {
+            return this._environment.global[globalVariable];
+          }
 
-        throw new Error(
-          `You have requested '${globalVariable}' as a global variable, but it was not present. Please check your config or your global environment.`,
-        );
-      }),
-    );
+          throw new Error(
+            `You have requested '${globalVariable}' as a global variable, but it was not present. Please check your config or your global environment.`,
+          );
+        }),
+      );
+    } catch (error) {
+      this.handleExecutionError(error, localModule);
+    }
 
     this._isCurrentlyExecutingManualMock = origCurrExecutingManualMock;
     this._currentlyExecutingModulePath = lastExecutingModulePath;
@@ -887,64 +901,75 @@ class Runtime {
     }
 
     if (moduleName === 'module') {
-      const createRequire = (modulePath: string | URL) => {
-        const filename =
-          typeof modulePath === 'string'
-            ? modulePath.startsWith('file:///')
-              ? fileURLToPath(new URL(modulePath))
-              : modulePath
-            : fileURLToPath(modulePath);
+      return this._getMockedNativeModule();
+    }
 
-        if (!path.isAbsolute(filename)) {
+    return require(moduleName);
+  }
+
+  private _getMockedNativeModule(): typeof nativeModule.Module {
+    if (this._moduleImplementation) {
+      return this._moduleImplementation;
+    }
+
+    const createRequire = (modulePath: string | URL) => {
+      const filename =
+        typeof modulePath === 'string'
+          ? modulePath.startsWith('file:///')
+            ? fileURLToPath(new URL(modulePath))
+            : modulePath
+          : fileURLToPath(modulePath);
+
+      if (!path.isAbsolute(filename)) {
+        const error = new TypeError(
+          `The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received '${filename}'`,
+        );
+        // @ts-ignore
+        error.code = 'ERR_INVALID_ARG_TYPE';
+        throw error;
+      }
+
+      return this._createRequireImplementation({
+        children: [],
+        exports: {},
+        filename,
+        id: filename,
+        loaded: false,
+      });
+    };
+
+    // should we implement the class ourselves?
+    class Module extends nativeModule.Module {}
+
+    Module.Module = Module;
+
+    if ('createRequire' in nativeModule) {
+      Module.createRequire = createRequire;
+    }
+    if ('createRequireFromPath' in nativeModule) {
+      Module.createRequireFromPath = (filename: string | URL) => {
+        if (typeof filename !== 'string') {
           const error = new TypeError(
-            `The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received '${filename}'`,
+            `The argument 'filename' must be string. Received '${filename}'.${
+              filename instanceof URL
+                ? ' Use createRequire for URL filename.'
+                : ''
+            }`,
           );
           // @ts-ignore
           error.code = 'ERR_INVALID_ARG_TYPE';
           throw error;
         }
-
-        return this._createRequireImplementation({
-          children: [],
-          exports: {},
-          filename,
-          id: filename,
-          loaded: false,
-        });
+        return createRequire(filename);
       };
-
-      const overriddenModules: Partial<typeof nativeModule> = {};
-
-      if ('createRequire' in nativeModule) {
-        overriddenModules.createRequire = createRequire;
-      }
-      if ('createRequireFromPath' in nativeModule) {
-        overriddenModules.createRequireFromPath = (filename: string | URL) => {
-          if (typeof filename !== 'string') {
-            const error = new TypeError(
-              `The argument 'filename' must be string. Received '${filename}'.${
-                filename instanceof URL
-                  ? ' Use createRequire for URL filename.'
-                  : ''
-              }`,
-            );
-            // @ts-ignore
-            error.code = 'ERR_INVALID_ARG_TYPE';
-            throw error;
-          }
-          return createRequire(filename);
-        };
-      }
-      if ('syncBuiltinESMExports' in nativeModule) {
-        overriddenModules.syncBuiltinESMExports = () => {};
-      }
-
-      return Object.keys(overriddenModules).length > 0
-        ? {...nativeModule, ...overriddenModules}
-        : nativeModule;
+    }
+    if ('syncBuiltinESMExports' in nativeModule) {
+      Module.syncBuiltinESMExports = () => {};
     }
 
-    return require(moduleName);
+    this._moduleImplementation = Module;
+
+    return Module;
   }
 
   private _generateMock(from: Config.Path, moduleName: string) {
@@ -1285,6 +1310,24 @@ class Runtime {
       'jest',
       ...this._config.extraGlobals,
     ];
+  }
+
+  private handleExecutionError(e: Error, module: InitialModule): never {
+    const moduleNotFoundError = Resolver.tryCastModuleNotFoundError(e);
+    if (moduleNotFoundError) {
+      if (!moduleNotFoundError.requireStack) {
+        moduleNotFoundError.requireStack = [module.filename || module.id];
+
+        for (let cursor = module.parent; cursor; cursor = cursor.parent) {
+          moduleNotFoundError.requireStack.push(cursor.filename || cursor.id);
+        }
+
+        moduleNotFoundError.buildMessage(this._config.rootDir);
+      }
+      throw moduleNotFoundError;
+    }
+
+    throw e;
   }
 }
 
