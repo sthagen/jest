@@ -2,13 +2,39 @@
 
 ### Features
 
+- `[expect]` Support `async function`s in `toThrow` ([#9817](https://github.com/facebook/jest/pull/9817))
+- `[jest-console]` Add code frame to `console.error` and `console.warn` ([#9741](https://github.com/facebook/jest/pull/9741))
+- `[@jest/globals]` New package so Jest's globals can be explicitly imported ([#9801](https://github.com/facebook/jest/pull/9801))
+- `[jest-runtime, jest-jasmine2, jest-circus]` Experimental, limited ECMAScript Modules support ([#9772](https://github.com/facebook/jest/pull/9772))
+
 ### Fixes
+
+- `[expect]` Restore support for passing functions to `toHaveLength` matcher ([#9796](https://github.com/facebook/jest/pull/9796))
+- `[jest-circus]` Throw on nested test definitions ([#9828](https://github.com/facebook/jest/pull/9828))
+- `[jest-changed-files]` `--only-changed` should include staged files ([#9799](https://github.com/facebook/jest/pull/9799))
+- `[jest-each]` `each` will throw an error when called with too many arguments ([#9818](https://github.com/facebook/jest/pull/9818))
 
 ### Chore & Maintenance
 
-- `[@jest/transform]` Expose type `CacheKeyOptions` for `getCacheKey` ([#9762](https://github.com/facebook/jest/pull/9762))
+- `[*]` Do not generate TypeScript declaration source maps ([#9822](https://github.com/facebook/jest/pull/9822))
+- `[*]` Transpile code for Node 8.3, not 8.0 ([#9827](https://github.com/facebook/jest/pull/9827))
 
 ### Performance
+
+## 25.3.0
+
+### Features
+
+- `[babel-jest]` Support passing `supportsDynamicImport` and `supportsStaticESM` ([#9766](https://github.com/facebook/jest/pull/9766))
+- `[babel-preset-jest]` Enable all syntax plugins not enabled by default that works on current version of Node ([#9774](https://github.com/facebook/jest/pull/9774))
+- `[jest-circus]` Enable writing async test event handlers ([#9397](https://github.com/facebook/jest/pull/9397))
+- `[jest-runtime, @jest/transformer]` Support passing `supportsDynamicImport` and `supportsStaticESM` ([#9597](https://github.com/facebook/jest/pull/9597))
+
+### Chore & Maintenance
+
+- `[*]` Replace `any`s with `unknown`s ([#9626](https://github.com/facebook/jest/pull/9626))
+- `[@jest/transform]` Expose type `CacheKeyOptions` for `getCacheKey` ([#9762](https://github.com/facebook/jest/pull/9762))
+- `[@jest/types]` Correct type `testRegex` for `ProjectConfig` ([#9780](https://github.com/facebook/jest/pull/9780))
 
 ## 25.2.7
 

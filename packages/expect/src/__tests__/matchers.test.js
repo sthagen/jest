@@ -56,6 +56,12 @@ describe('.rejects', () => {
     await jestExpect(fn()).rejects.toThrow('some error');
   });
 
+  it('should reject async function to toThrow', async () => {
+    await expect(async () => {
+      throw new Error('Test');
+    }).rejects.toThrow('Test');
+  });
+
   ['a', [1], () => {}, {a: 1}].forEach(value => {
     it(`fails non-promise value ${stringify(value)} synchronously`, () => {
       let error;
@@ -1694,6 +1700,7 @@ describe('.toHaveLength', () => {
     [['a', 'b'], 2],
     ['abc', 3],
     ['', 0],
+    [() => {}, 0],
   ].forEach(([received, length]) => {
     test(`{pass: true} expect(${stringify(
       received,
