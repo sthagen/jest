@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type {Script} from 'vm';
+import type {Context, Script} from 'vm';
 import type {Config, Global} from '@jest/types';
 import {installCommonGlobals} from 'jest-util';
 import {ModuleMocker} from 'jest-mock';
@@ -46,6 +46,10 @@ class JSDOMEnvironment implements JestEnvironment {
     if (!global) {
       throw new Error('JSDOM did not return a Window object');
     }
+
+    // In the `jsdom@16`, ArrayBuffer was not added to Window, ref: https://github.com/jsdom/jsdom/commit/3a4fd6258e6b13e9cf8341ddba60a06b9b5c7b5b
+    // Install ArrayBuffer to Window to fix it. Make sure the test is passed, ref: https://github.com/facebook/jest/pull/7626
+    global.ArrayBuffer = ArrayBuffer;
 
     // Node's error-message stack size is limited at 10, but it's pretty useful
     // to see more than that when a test fails.
@@ -126,7 +130,14 @@ class JSDOMEnvironment implements JestEnvironment {
 
   runScript<T = unknown>(script: Script): T | null {
     if (this.dom) {
-      return this.dom.runVMScript(script) as any;
+      return script.runInContext(this.dom.getInternalVMContext());
+    }
+    return null;
+  }
+
+  getVmContext(): Context | null {
+    if (this.dom) {
+      return this.dom.getInternalVMContext();
     }
     return null;
   }

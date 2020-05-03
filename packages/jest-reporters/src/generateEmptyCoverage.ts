@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import * as fs from 'fs';
+import * as fs from 'graceful-fs';
 import type {Config} from '@jest/types';
 import {readInitialCoverage} from 'istanbul-lib-instrument';
 import {FileCoverage, createFileCoverage} from 'istanbul-lib-coverage';
@@ -30,6 +30,7 @@ export default function (
   globalConfig: Config.GlobalConfig,
   config: Config.ProjectConfig,
   changedFiles?: Set<Config.Path>,
+  sourcesRelatedToTestsInChangedFiles?: Set<Config.Path>,
 ): CoverageWorkerResult | null {
   const coverageOptions = {
     changedFiles,
@@ -37,6 +38,7 @@ export default function (
     collectCoverageFrom: globalConfig.collectCoverageFrom,
     collectCoverageOnlyFrom: globalConfig.collectCoverageOnlyFrom,
     coverageProvider: globalConfig.coverageProvider,
+    sourcesRelatedToTestsInChangedFiles,
   };
   let coverageWorkerResult: CoverageWorkerResult | null = null;
   if (shouldInstrument(filename, coverageOptions, config)) {

@@ -6,7 +6,7 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'graceful-fs';
 import type {Config} from '@jest/types';
 import type {
   AggregatedResult,
@@ -182,6 +182,9 @@ export default class CoverageReporter extends BaseReporter {
               changedFiles:
                 this._options.changedFiles &&
                 Array.from(this._options.changedFiles),
+              sourcesRelatedToTestsInChangedFiles:
+                this._options.sourcesRelatedToTestsInChangedFiles &&
+                Array.from(this._options.sourcesRelatedToTestsInChangedFiles),
             },
             path: filename,
           });

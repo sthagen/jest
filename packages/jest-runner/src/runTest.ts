@@ -6,7 +6,6 @@
  *
  */
 
-import {compileFunction} from 'vm';
 import type {Config} from '@jest/types';
 import type {TestResult} from '@jest/test-result';
 import {
@@ -147,17 +146,20 @@ async function runTestInternal(
   setGlobal(environment.global, 'console', testConsole);
 
   const runtime = new Runtime(config, environment, resolver, cacheFS, {
-    changedFiles: context && context.changedFiles,
+    changedFiles: context?.changedFiles,
     collectCoverage: globalConfig.collectCoverage,
     collectCoverageFrom: globalConfig.collectCoverageFrom,
     collectCoverageOnlyFrom: globalConfig.collectCoverageOnlyFrom,
     coverageProvider: globalConfig.coverageProvider,
+    sourcesRelatedToTestsInChangedFiles:
+      context?.sourcesRelatedToTestsInChangedFiles,
   });
 
   const start = Date.now();
 
   for (const path of config.setupFiles) {
-    const esm = runtime.unstable_shouldLoadAsEsm(path);
+    // TODO: remove ? in Jest 26
+    const esm = runtime.unstable_shouldLoadAsEsm?.(path);
 
     if (esm) {
       await runtime.unstable_importModule(path);
@@ -223,11 +225,10 @@ async function runTestInternal(
     };
   }
 
-  // if we don't have `getVmContext` on the env,or `compileFunction` available skip coverage
+  // if we don't have `getVmContext` on the env skip coverage
   const collectV8Coverage =
     globalConfig.coverageProvider === 'v8' &&
-    typeof environment.getVmContext === 'function' &&
-    typeof compileFunction === 'function';
+    typeof environment.getVmContext === 'function';
 
   try {
     await environment.setup();
@@ -298,6 +299,8 @@ async function runTestInternal(
     });
   } finally {
     await environment.teardown();
+    // TODO: this function might be missing, remove ? in Jest 26
+    runtime.teardown?.();
 
     sourcemapSupport.resetRetrieveHandlers();
   }

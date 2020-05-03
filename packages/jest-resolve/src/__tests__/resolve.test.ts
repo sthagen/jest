@@ -6,8 +6,8 @@
  *
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'graceful-fs';
 import {ModuleMap} from 'jest-haste-map';
 import Resolver = require('../');
 // @ts-ignore: js file
@@ -234,8 +234,11 @@ describe('Resolver.getModulePaths() -> nodeModulesPaths()', () => {
     // pathstrings instead of actually trying to access the physical directory.
     // This test suite won't work otherwise, since we cannot make assumptions
     // about the test environment when it comes to absolute paths.
-    jest.doMock('realpath-native', () => ({
-      sync: (dirInput: string) => dirInput,
+    jest.doMock('graceful-fs', () => ({
+      ...jest.requireActual('graceful-fs'),
+      realPathSync: {
+        native: (dirInput: string) => dirInput,
+      },
     }));
   });
 

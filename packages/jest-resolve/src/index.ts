@@ -8,14 +8,14 @@
 import * as path from 'path';
 import type {Config} from '@jest/types';
 import type {ModuleMap} from 'jest-haste-map';
-import {sync as realpath} from 'realpath-native';
-import chalk = require('chalk');
+import {tryRealpath} from 'jest-util';
 import nodeModulesPaths from './nodeModulesPaths';
 import isBuiltinModule from './isBuiltinModule';
 import defaultResolver, {clearDefaultResolverCache} from './defaultResolver';
 import type {ResolverConfig} from './types';
 import ModuleNotFoundError from './ModuleNotFoundError';
 import shouldLoadAsEsm, {clearCachedLookups} from './shouldLoadAsEsm';
+import chalk = require('chalk');
 
 type FindNodeModuleConfig = {
   basedir: Config.Path;
@@ -28,6 +28,7 @@ type FindNodeModuleConfig = {
   throwIfNotFound?: boolean;
 };
 
+// TODO: replace with a Map in Jest 26
 type BooleanObject = Record<string, boolean>;
 
 namespace Resolver {
@@ -40,8 +41,7 @@ namespace Resolver {
 const NATIVE_PLATFORM = 'native';
 
 // We might be inside a symlink.
-const cwd = process.cwd();
-const resolvedCwd = realpath(cwd) || cwd;
+const resolvedCwd = tryRealpath(process.cwd());
 const {NODE_PATH} = process.env;
 const nodePaths = NODE_PATH
   ? NODE_PATH.split(path.delimiter)
@@ -61,7 +61,6 @@ class Resolver {
 
   constructor(moduleMap: ModuleMap, options: ResolverConfig) {
     this._options = {
-      browser: options.browser,
       defaultPlatform: options.defaultPlatform,
       extensions: options.extensions,
       hasCoreModules:
@@ -183,7 +182,6 @@ class Resolver {
     const resolveNodeModule = (name: Config.Path, throwIfNotFound = false) =>
       Resolver.findNodeModule(name, {
         basedir: dirname,
-        browser: this._options.browser,
         extensions,
         moduleDirectory,
         paths,
@@ -218,7 +216,7 @@ class Resolver {
           resolveNodeModule(module) || require.resolve(module);
         this._moduleNameCache.set(key, resolvedModule);
         return resolvedModule;
-      } catch (ignoredError) {}
+      } catch {}
     }
 
     return null;
@@ -437,7 +435,6 @@ class Resolver {
               this.getModule(updatedName) ||
               Resolver.findNodeModule(updatedName, {
                 basedir: dirname,
-                browser: this._options.browser,
                 extensions,
                 moduleDirectory,
                 paths,

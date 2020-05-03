@@ -10,7 +10,7 @@ import {wrap} from 'jest-snapshot-serializer-raw';
 import {makeGlobalConfig, makeProjectConfig} from '../../../../TestUtils';
 
 jest
-  .mock('fs', () =>
+  .mock('graceful-fs', () =>
     // Node 10.5.x compatibility
     ({
       ...jest.genMockFromModule('fs'),
@@ -29,7 +29,12 @@ jest
       }),
     }),
   )
-  .mock('graceful-fs')
+  .mock('graceful-fs', () => ({
+    ...jest.requireActual('graceful-fs'),
+    realPathSync: {
+      native: dirInput => dirInput,
+    },
+  }))
   .mock('jest-haste-map', () => ({
     getCacheFilePath: (cacheDir, baseDir, version) => cacheDir + baseDir,
   }))
