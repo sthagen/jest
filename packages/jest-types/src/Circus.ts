@@ -201,19 +201,22 @@ export type State = {
 };
 
 export type DescribeBlock = {
-  children: Array<DescribeBlock>;
+  type: 'describeBlock';
+  children: Array<DescribeBlock | TestEntry>;
   hooks: Array<Hook>;
   mode: BlockMode;
   name: BlockName;
   parent?: DescribeBlock;
+  /** @deprecated Please get from `children` array instead */
   tests: Array<TestEntry>;
 };
 
 export type TestError = Exception | [Exception | undefined, Exception]; // the error from the test, as well as a backup error for async
 
 export type TestEntry = {
+  type: 'test';
   asyncError: Exception; // Used if the test failure contains no usable stack trace
-  errors: TestError;
+  errors: Array<TestError>;
   fn?: TestFn;
   invocations: number;
   mode: TestMode;
