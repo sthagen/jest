@@ -9,12 +9,12 @@ import {URL, fileURLToPath, pathToFileURL} from 'url';
 import * as path from 'path';
 import {
   Script,
-  // @ts-ignore: experimental, not added to the types
+  // @ts-expect-error: experimental, not added to the types
   SourceTextModule,
-  // @ts-ignore: experimental, not added to the types
+  // @ts-expect-error: experimental, not added to the types
   SyntheticModule,
   Context as VMContext,
-  // @ts-ignore: experimental, not added to the types
+  // @ts-expect-error: experimental, not added to the types
   Module as VMModule,
   compileFunction,
 } from 'vm';
@@ -45,7 +45,11 @@ import {CoverageInstrumenter, V8Coverage} from 'collect-v8-coverage';
 import * as fs from 'graceful-fs';
 import {run as cliRun} from './cli';
 import {options as cliOptions} from './cli/args';
-import {findSiblingsWithFileExtension} from './helpers';
+import {
+  createOutsideJestVmPath,
+  decodePossibleOutsideJestVmPath,
+  findSiblingsWithFileExtension,
+} from './helpers';
 import type {Context as JestContext} from './types';
 import jestMock = require('jest-mock');
 import HasteMap = require('jest-haste-map');
@@ -81,7 +85,13 @@ const defaultTransformOptions: InternalModuleOptions = {
 type InitialModule = Partial<Module> &
   Pick<Module, 'children' | 'exports' | 'filename' | 'id' | 'loaded'>;
 type ModuleRegistry = Map<string, InitialModule | Module>;
-type ResolveOptions = Parameters<typeof require.resolve>[1];
+
+const OUTSIDE_JEST_VM_RESOLVE_OPTION = Symbol.for(
+  'OUTSIDE_JEST_VM_RESOLVE_OPTION',
+);
+type ResolveOptions = Parameters<typeof require.resolve>[1] & {
+  [OUTSIDE_JEST_VM_RESOLVE_OPTION]?: true;
+};
 
 type StringMap = Map<string, string>;
 type BooleanMap = Map<string, boolean>;
@@ -450,7 +460,7 @@ class Runtime {
     const module = new SyntheticModule(
       ['default'],
       function () {
-        // @ts-ignore: TS doesn't know what `this` is
+        // @ts-expect-error: TS doesn't know what `this` is
         this.setExport('default', cjs);
       },
       {context, identifier: modulePath},
@@ -547,6 +557,13 @@ class Runtime {
   }
 
   requireInternalModule<T = unknown>(from: Config.Path, to?: string): T {
+    if (to) {
+      const outsideJestVmPath = decodePossibleOutsideJestVmPath(to);
+      if (outsideJestVmPath) {
+        return require(outsideJestVmPath);
+      }
+    }
+
     return this.requireModule(from, to, {
       isInternalModule: true,
       supportsDynamicImport: false,
@@ -686,7 +703,7 @@ class Runtime {
   requireModuleOrMock<T = unknown>(from: Config.Path, moduleName: string): T {
     // this module is unmockable
     if (moduleName === '@jest/globals') {
-      // @ts-ignore: we don't care that it's not assignable to T
+      // @ts-expect-error: we don't care that it's not assignable to T
       return this.getGlobalsForCjs(from);
     }
 
@@ -1112,10 +1129,10 @@ class Runtime {
     return new SyntheticModule(
       ['default', ...Object.keys(required)],
       function () {
-        // @ts-ignore: TS doesn't know what `this` is
+        // @ts-expect-error: TS doesn't know what `this` is
         this.setExport('default', required);
         Object.entries(required).forEach(([key, value]) => {
-          // @ts-ignore: TS doesn't know what `this` is
+          // @ts-expect-error: TS doesn't know what `this` is
           this.setExport(key, value);
         });
       },
@@ -1141,7 +1158,7 @@ class Runtime {
         const error = new TypeError(
           `The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received '${filename}'`,
         );
-        // @ts-ignore
+        // @ts-expect-error
         error.code = 'ERR_INVALID_ARG_TYPE';
         throw error;
       }
@@ -1159,7 +1176,7 @@ class Runtime {
     class Module extends nativeModule.Module {}
 
     Object.entries(nativeModule.Module).forEach(([key, value]) => {
-      // @ts-ignore
+      // @ts-expect-error
       Module[key] = value;
     });
 
@@ -1180,7 +1197,7 @@ class Runtime {
                 : ''
             }`,
           );
-          // @ts-ignore
+          // @ts-expect-error
           error.code = 'ERR_INVALID_ARG_TYPE';
           throw error;
         }
@@ -1307,9 +1324,20 @@ class Runtime {
     from: InitialModule,
     options?: InternalModuleOptions,
   ): NodeRequire {
-    // TODO: somehow avoid having to type the arguments - they should come from `NodeRequire/LocalModuleRequire.resolve`
-    const resolve = (moduleName: string, options: ResolveOptions) =>
-      this._requireResolve(from.filename, moduleName, options);
+    const resolve = (moduleName: string, resolveOptions?: ResolveOptions) => {
+      const resolved = this._requireResolve(
+        from.filename,
+        moduleName,
+        resolveOptions,
+      );
+      if (
+        resolveOptions?.[OUTSIDE_JEST_VM_RESOLVE_OPTION] &&
+        options?.isInternalModule
+      ) {
+        return createOutsideJestVmPath(resolved);
+      }
+      return resolved;
+    };
     resolve.paths = (moduleName: string) =>
       this._requireResolvePaths(from.filename, moduleName);
 
@@ -1458,14 +1486,14 @@ class Runtime {
       if (this._environment.global.jasmine) {
         this._environment.global.jasmine._DEFAULT_TIMEOUT_INTERVAL = timeout;
       } else {
-        // @ts-ignore: https://github.com/Microsoft/TypeScript/issues/24587
+        // @ts-expect-error: https://github.com/Microsoft/TypeScript/issues/24587
         this._environment.global[testTimeoutSymbol] = timeout;
       }
       return jestObject;
     };
 
     const retryTimes = (numTestRetries: number) => {
-      // @ts-ignore: https://github.com/Microsoft/TypeScript/issues/24587
+      // @ts-expect-error: https://github.com/Microsoft/TypeScript/issues/24587
       this._environment.global[retryTimesSymbol] = numTestRetries;
       return jestObject;
     };
@@ -1638,7 +1666,7 @@ class Runtime {
       Object.keys(globals),
       function () {
         Object.entries(globals).forEach(([key, value]) => {
-          // @ts-ignore: TS doesn't know what `this` is
+          // @ts-expect-error: TS doesn't know what `this` is
           this.setExport(key, value);
         });
       },

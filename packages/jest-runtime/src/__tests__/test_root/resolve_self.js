@@ -5,11 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export default (
-  globalToMutate: NodeJS.Global | Window,
-  key: string,
-  value: unknown,
-): void => {
-  // @ts-expect-error: no index
-  globalToMutate[key] = value;
-};
+'use strict';
+
+module.exports = require.resolve('./resolve_self');
