@@ -8,6 +8,14 @@
 import type {EventEmitter} from 'events';
 import type {ForkOptions} from 'child_process';
 
+// import type {ResourceLimits} from 'worker_threads';
+// This is not present in the Node 12 typings
+export interface ResourceLimits {
+  maxYoungGenerationSizeMb?: number;
+  maxOldGenerationSizeMb?: number;
+  codeRangeSizeMb?: number;
+}
+
 // Because of the dynamic nature of a worker communication process, all messages
 // coming from any of the other processes cannot be typed. Thus, many types
 // include "unknown" as a TS type, which is (unfortunately) correct here.
@@ -71,6 +79,7 @@ export type FarmOptions = {
   computeWorkerKey?: (method: string, ...args: Array<unknown>) => string | null;
   exposedMethods?: ReadonlyArray<string>;
   forkOptions?: ForkOptions;
+  resourceLimits?: ResourceLimits;
   setupArgs?: Array<unknown>;
   maxRetries?: number;
   numWorkers?: number;
@@ -84,6 +93,7 @@ export type FarmOptions = {
 export type WorkerPoolOptions = {
   setupArgs: Array<unknown>;
   forkOptions: ForkOptions;
+  resourceLimits: ResourceLimits;
   maxRetries: number;
   numWorkers: number;
   enableWorkerThreads: boolean;
@@ -91,6 +101,7 @@ export type WorkerPoolOptions = {
 
 export type WorkerOptions = {
   forkOptions: ForkOptions;
+  resourceLimits: ResourceLimits;
   setupArgs: Array<unknown>;
   maxRetries: number;
   workerId: number;
@@ -162,7 +173,7 @@ export type ParentMessage =
 
 export type OnStart = (worker: WorkerInterface) => void;
 export type OnEnd = (err: Error | null, result: unknown) => void;
-export type OnCustomMessage = (message: unknown) => void;
+export type OnCustomMessage = (message: Array<unknown> | unknown) => void;
 
 export type QueueChildMessage = {
   request: ChildMessage;
