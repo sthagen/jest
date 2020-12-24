@@ -5,14 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type {V8Coverage} from 'collect-v8-coverage';
 import type {CoverageMap, CoverageMapData} from 'istanbul-lib-coverage';
 import type {ConsoleBuffer} from '@jest/console';
 import type {Config, TestResult, TransformTypes} from '@jest/types';
-import type {V8Coverage} from 'collect-v8-coverage';
 
 export interface RuntimeTransformResult extends TransformTypes.TransformResult {
-  // TODO: Make mandatory in Jest 27
-  wrapperLength?: number;
+  wrapperLength: number;
 }
 
 export type V8CoverageResult = Array<{
@@ -112,10 +111,6 @@ export type TestResult = {
     uncheckedKeys: Array<string>;
     unmatched: number;
     updated: number;
-  };
-  // TODO - Remove in Jest 26
-  sourceMaps?: {
-    [sourcePath: string]: string;
   };
   testExecError?: SerializableError;
   testFilePath: Config.Path;

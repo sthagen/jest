@@ -5,9 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type {Arguments} from 'yargs';
-import type {ReportOptions} from 'istanbul-reports';
 import type {ForegroundColor} from 'chalk';
+import type {ReportOptions} from 'istanbul-reports';
+import type {Arguments} from 'yargs';
 
 type CoverageProvider = 'babel' | 'v8';
 
@@ -18,10 +18,15 @@ export type Path = string;
 export type Glob = string;
 
 export type HasteConfig = {
+  /** Whether to hash files using SHA-1. */
   computeSha1?: boolean;
+  /** The platform to use as the default, e.g. 'ios'. */
   defaultPlatform?: string | null;
+  /** Path to a custom implementation of Haste. */
   hasteImplModulePath?: string;
+  /** All platforms to target, e.g ['ios', 'android']. */
   platforms?: Array<string>;
+  /** Whether to throw on error on module collision. */
   throwOnModuleCollision?: boolean;
 };
 
@@ -59,6 +64,7 @@ export type DefaultOptions = {
   coverageProvider: CoverageProvider;
   errorOnDeprecated: boolean;
   expand: boolean;
+  extensionsToTreatAsEsm: Array<Path>;
   forceCoverageMatch: Array<Glob>;
   globals: ConfigGlobals;
   haste: HasteConfig;
@@ -127,16 +133,13 @@ export type InitialOptions = Partial<{
   coveragePathIgnorePatterns: Array<string>;
   coverageProvider: CoverageProvider;
   coverageReporters: CoverageReporters;
-  coverageThreshold: {
-    global: {
-      [key: string]: number;
-    };
-  };
+  coverageThreshold: CoverageThreshold;
   dependencyExtractor: string;
   detectLeaks: boolean;
   detectOpenHandles: boolean;
   displayName: string | DisplayName;
   expand: boolean;
+  extensionsToTreatAsEsm: Array<Path>;
   extraGlobals: Array<string>;
   filter: Path;
   findRelatedTests: boolean;
@@ -152,7 +155,6 @@ export type InitialOptions = Partial<{
   logHeapUsage: boolean;
   lastCommit: boolean;
   listTests: boolean;
-  mapCoverage: boolean;
   maxConcurrency: number;
   maxWorkers: number | string;
   moduleDirectories: Array<string>;
@@ -263,11 +265,6 @@ export type GlobalConfig = {
   coverageThreshold?: CoverageThreshold;
   detectLeaks: boolean;
   detectOpenHandles: boolean;
-  enabledTestsMap?: {
-    [key: string]: {
-      [key: string]: boolean;
-    };
-  };
   expand: boolean;
   filter?: Path;
   findRelatedTests: boolean;
@@ -327,6 +324,7 @@ export type ProjectConfig = {
   detectOpenHandles: boolean;
   displayName?: DisplayName;
   errorOnDeprecated: boolean;
+  extensionsToTreatAsEsm: Array<Path>;
   extraGlobals: Array<keyof NodeJS.Global>;
   filter?: Path;
   forceCoverageMatch: Array<Glob>;

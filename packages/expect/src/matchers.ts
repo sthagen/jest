@@ -27,7 +27,7 @@ import {
   printWithType,
   stringify,
 } from 'jest-matcher-utils';
-import type {MatcherState, MatchersObject} from './types';
+import {equals} from './jasmineUtils';
 import {
   printCloseTo,
   printExpectedConstructorName,
@@ -38,6 +38,7 @@ import {
   printReceivedStringContainExpectedResult,
   printReceivedStringContainExpectedSubstring,
 } from './print';
+import type {MatcherState, MatchersObject} from './types';
 import {
   getObjectSubset,
   getPath,
@@ -46,7 +47,6 @@ import {
   subsetEquality,
   typeEquality,
 } from './utils';
-import {equals} from './jasmineUtils';
 
 // Omit colon and one or more spaces, so can call getLabelPrinter.
 const EXPECTED_LABEL = 'Expected';
@@ -474,6 +474,24 @@ const matchers: MatchersObject = {
     }
 
     if (typeof received === 'string') {
+      const wrongTypeErrorMessage = `${EXPECTED_COLOR(
+        'expected',
+      )} value must be a string if ${RECEIVED_COLOR(
+        'received',
+      )} value is a string`;
+
+      if (typeof expected !== 'string') {
+        throw new Error(
+          matcherErrorMessage(
+            matcherHint(matcherName, received, String(expected), options),
+            wrongTypeErrorMessage,
+            printWithType('Expected', expected, printExpected) +
+              '\n' +
+              printWithType('Received', received, printReceived),
+          ),
+        );
+      }
+
       const index = received.indexOf(String(expected));
       const pass = index !== -1;
 

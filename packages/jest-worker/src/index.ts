@@ -8,8 +8,8 @@
 /* eslint-disable local/ban-types-eventually */
 
 import {cpus} from 'os';
-import WorkerPool from './WorkerPool';
 import Farm from './Farm';
+import WorkerPool from './WorkerPool';
 import type {
   FarmOptions,
   PoolExitResult,
@@ -67,7 +67,7 @@ function getExposedMethods(
  *     processed by the same worker. This is specially useful if your workers
  *     are caching results.
  */
-export default class JestWorker {
+export class Worker {
   private _ending: boolean;
   private _farm: Farm;
   private _options: FarmOptions;

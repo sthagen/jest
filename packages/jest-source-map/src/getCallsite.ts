@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {readFileSync} from 'graceful-fs';
 import callsites = require('callsites');
+import {readFileSync} from 'graceful-fs';
 import {SourceMapConsumer} from 'source-map';
 import type {SourceMapRegistry} from './types';
 
@@ -52,7 +52,7 @@ export default (
 ): callsites.CallSite => {
   const levelAfterThisCall = level + 1;
   const stack = callsites()[levelAfterThisCall];
-  const sourceMapFileName = sourceMaps && sourceMaps[stack.getFileName() || ''];
+  const sourceMapFileName = sourceMaps?.get(stack.getFileName() || '');
 
   if (sourceMapFileName) {
     try {

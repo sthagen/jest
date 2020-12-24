@@ -7,13 +7,12 @@
 
 /* eslint-disable local/prefer-rest-params-eventually */
 
-import React from 'react';
 import Immutable from 'immutable';
-
-import prettyFormat from '..';
+import React from 'react';
+import {plugins} from '..';
 import setPrettyPrint from './setPrettyPrint';
 
-const {Immutable: ImmutablePlugin, ReactElement} = prettyFormat.plugins;
+const {Immutable: ImmutablePlugin, ReactElement} = plugins;
 
 setPrettyPrint([ReactElement, ImmutablePlugin]);
 

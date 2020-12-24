@@ -5,10 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-const {stringify} = require('jest-matcher-utils');
-const {alignedAnsiStyleSerializer} = require('@jest/test-utils');
-const Immutable = require('immutable');
 const chalk = require('chalk');
+const Immutable = require('immutable');
+const {alignedAnsiStyleSerializer} = require('@jest/test-utils');
+const {stringify} = require('jest-matcher-utils');
 const jestExpect = require('../');
 const chalkEnabled = chalk.enabled;
 
@@ -1463,6 +1463,21 @@ describe('.toContain(), .toContainEqual()', () => {
 
   test('error cases', () => {
     expect(() => jestExpect(null).toContain(1)).toThrowErrorMatchingSnapshot();
+    expect(() => jestExpect('-0').toContain(-0)).toThrowErrorMatchingSnapshot();
+    expect(() =>
+      jestExpect('null').toContain(null),
+    ).toThrowErrorMatchingSnapshot();
+    expect(() =>
+      jestExpect('undefined').toContain(undefined),
+    ).toThrowErrorMatchingSnapshot();
+    expect(() =>
+      jestExpect('false').toContain(false),
+    ).toThrowErrorMatchingSnapshot();
+    if (isBigIntDefined) {
+      expect(() => jestExpect('1').toContain(BigInt(1))).toThrowError(
+        'toContain',
+      );
+    }
   });
 
   [

@@ -240,8 +240,8 @@ It's also possible to create custom matchers for inline snapshots, the snapshots
 const {toMatchInlineSnapshot} = require('jest-snapshot');
 
 expect.extend({
-  toMatchTrimmedInlineSnapshot(received) {
-    return toMatchInlineSnapshot.call(this, received.substring(0, 10));
+  toMatchTrimmedInlineSnapshot(received, ...rest) {
+    return toMatchInlineSnapshot.call(this, received.substring(0, 10), ...rest);
   },
 });
 
@@ -252,6 +252,41 @@ it('stores only 10 characters', () => {
   expect('extra long string oh my gerd').toMatchTrimmedInlineSnapshot(
     `"extra long"`
   );
+  */
+});
+```
+
+#### async
+
+If your custom inline snapshot matcher is async i.e. uses `async`-`await` you might encounter an error like "Multiple inline snapshots for the same call are not supported". Jest needs additional context information to find where the custom inline snapshot matcher was used to update the snapshots properly.
+
+```js
+const {toMatchInlineSnapshot} = require('jest-snapshot');
+
+expect.extend({
+  async toMatchObservationInlineSnapshot(fn, ...rest) {
+    // The error (and its stacktrace) must be created before any `await`
+    this.error = new Error();
+
+    // The implementation of `observe` doesn't matter.
+    // It only matters that the custom snapshot matcher is async.
+    const observation = await observe(async () => {
+      await fn();
+    });
+
+    return toMatchInlineSnapshot.call(this, recording, ...rest);
+  },
+});
+
+it('observes something', async () => {
+  await expect(async () => {
+    return 'async action';
+  }).toMatchTrimmedInlineSnapshot();
+  /*
+  The snapshot will be added inline like
+  await expect(async () => {
+    return 'async action';
+  }).toMatchTrimmedInlineSnapshot(`"async action"`);
   */
 });
 ```
@@ -496,7 +531,7 @@ expect.addSnapshotSerializer(serializer);
 // affects expect(value).toMatchSnapshot() assertions in the test file
 ```
 
-If you add a snapshot serializer in individual test files instead of to adding it to `snapshotSerializers` configuration:
+If you add a snapshot serializer in individual test files instead of adding it to `snapshotSerializers` configuration:
 
 - You make the dependency explicit instead of implicit.
 - You avoid limits to configuration that might cause you to eject from [create-react-app](https://github.com/facebookincubator/create-react-app).

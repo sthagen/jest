@@ -8,7 +8,6 @@
 'use strict';
 
 import EventEmitter from 'events';
-
 import {CHILD_MESSAGE_CALL, PARENT_MESSAGE_OK} from '../types';
 
 let Farm;
@@ -56,7 +55,7 @@ describe('Jest Worker Integration', () => {
       },
     }));
 
-    Farm = require('../index').default;
+    Farm = require('../index').Worker;
   });
 
   afterEach(() => {
