@@ -47,7 +47,7 @@ export type {
 export default class TestRunner {
   private readonly _globalConfig: Config.GlobalConfig;
   private readonly _context: TestRunnerContext;
-  private readonly eventEmitter = new Emittery.Typed<TestEvents>();
+  private readonly eventEmitter = new Emittery<TestEvents>();
   readonly __PRIVATE_UNSTABLE_API_supportsEventEmitters__: boolean = true;
 
   readonly isSerial?: boolean;
@@ -166,7 +166,12 @@ export default class TestRunner {
 
     const worker = new Worker(TEST_WORKER_PATH, {
       exposedMethods: ['worker'],
-      forkOptions: {stdio: 'pipe'},
+      forkOptions: {
+        // use advanced serialization in order to transfer objects with circular references
+        // @ts-expect-error: option does not exist on the node 10 types
+        serialization: 'advanced',
+        stdio: 'pipe',
+      },
       maxRetries: 3,
       numWorkers: this._globalConfig.maxWorkers,
       setupArgs: [
