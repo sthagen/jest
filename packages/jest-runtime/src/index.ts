@@ -36,6 +36,7 @@ import {
   CallerTransformOptions,
   ScriptTransformer,
   ShouldInstrumentOptions,
+  TransformResult,
   TransformationOptions,
   handlePotentialSyntaxError,
   shouldInstrument,
@@ -185,6 +186,7 @@ export default class Runtime {
   private readonly _sourceMapRegistry: Map<string, string>;
   private readonly _scriptTransformer: ScriptTransformer;
   private readonly _fileTransforms: Map<string, RuntimeTransformResult>;
+  private readonly _fileTransformsMutex: Map<string, Promise<void>>;
   private _v8CoverageInstrumenter: CoverageInstrumenter | undefined;
   private _v8CoverageResult: V8Coverage | undefined;
   private readonly _transitiveShouldMock: Map<string, boolean>;
@@ -198,6 +200,7 @@ export default class Runtime {
     config: Config.ProjectConfig,
     environment: JestEnvironment,
     resolver: Resolver,
+    transformer: ScriptTransformer,
     cacheFS: Map<string, string>,
     coverageOptions: ShouldInstrumentOptions,
     testPath: Config.Path,
@@ -226,10 +229,11 @@ export default class Runtime {
     this._esmModuleLinkingMap = new WeakMap();
     this._testPath = testPath;
     this._resolver = resolver;
-    this._scriptTransformer = new ScriptTransformer(config, this._cacheFS);
+    this._scriptTransformer = transformer;
     this._shouldAutoMock = config.automock;
     this._sourceMapRegistry = new Map();
     this._fileTransforms = new Map();
+    this._fileTransformsMutex = new Map();
     this._virtualMocks = new Map();
     this.jestObjectCaches = new Map();
 
@@ -372,6 +376,10 @@ export default class Runtime {
   ): Promise<VMModule> {
     const cacheKey = modulePath + query;
 
+    if (this._fileTransformsMutex.has(cacheKey)) {
+      await this._fileTransformsMutex.get(cacheKey);
+    }
+
     if (!this._esmoduleRegistry.has(cacheKey)) {
       invariant(
         typeof this._environment.getVmContext === 'function',
@@ -382,13 +390,32 @@ export default class Runtime {
 
       invariant(context, 'Test environment has been torn down');
 
+      let transformResolve: () => void;
+      let transformReject: (error?: unknown) => void;
+
+      this._fileTransformsMutex.set(
+        cacheKey,
+        new Promise((resolve, reject) => {
+          transformResolve = resolve;
+          transformReject = reject;
+        }),
+      );
+
+      invariant(
+        transformResolve! && transformReject!,
+        'Promise initialization should be sync - please report this bug to Jest!',
+      );
+
       if (this._resolver.isCoreModule(modulePath)) {
         const core = this._importCoreModule(modulePath, context);
         this._esmoduleRegistry.set(cacheKey, core);
+
+        transformResolve();
+
         return core;
       }
 
-      const transformedCode = this.transformFile(modulePath, {
+      const transformedCode = await this.transformFileAsync(modulePath, {
         isInternalModule: false,
         supportsDynamicImport: true,
         supportsExportNamespaceFrom: true,
@@ -396,27 +423,43 @@ export default class Runtime {
         supportsTopLevelAwait,
       });
 
-      const module = new SourceTextModule(transformedCode, {
-        context,
-        identifier: modulePath,
-        importModuleDynamically: async (
-          specifier: string,
-          referencingModule: VMModule,
-        ) => {
-          const module = await this.resolveModule(
-            specifier,
-            referencingModule.identifier,
-            referencingModule.context,
-          );
+      try {
+        const module = new SourceTextModule(transformedCode, {
+          context,
+          identifier: modulePath,
+          importModuleDynamically: async (
+            specifier: string,
+            referencingModule: VMModule,
+          ) => {
+            invariant(
+              runtimeSupportsVmModules,
+              'You need to run with a version of node that supports ES Modules in the VM API. See https://jestjs.io/docs/en/ecmascript-modules',
+            );
+            const module = await this.resolveModule(
+              specifier,
+              referencingModule.identifier,
+              referencingModule.context,
+            );
 
-          return this.linkAndEvaluateModule(module);
-        },
-        initializeImportMeta(meta: ImportMeta) {
-          meta.url = pathToFileURL(modulePath).href;
-        },
-      });
+            return this.linkAndEvaluateModule(module);
+          },
+          initializeImportMeta(meta: ImportMeta) {
+            meta.url = pathToFileURL(modulePath).href;
+          },
+        });
 
-      this._esmoduleRegistry.set(cacheKey, module);
+        invariant(
+          !this._esmoduleRegistry.has(cacheKey),
+          `Module cache already has entry ${cacheKey}. This is a bug in Jest, please report it!`,
+        );
+
+        this._esmoduleRegistry.set(cacheKey, module);
+
+        transformResolve();
+      } catch (error: unknown) {
+        transformReject(error);
+        throw error;
+      }
     }
 
     const module = this._esmoduleRegistry.get(cacheKey);
@@ -495,7 +538,7 @@ export default class Runtime {
   ): Promise<void> {
     invariant(
       runtimeSupportsVmModules,
-      'You need to run with a version of node that supports ES Modules in the VM API.',
+      'You need to run with a version of node that supports ES Modules in the VM API. See https://jestjs.io/docs/en/ecmascript-modules',
     );
 
     const [path, query] = (moduleName ?? '').split('?');
@@ -605,16 +648,26 @@ export default class Runtime {
       modulePath = this._resolveModule(from, moduleName);
     }
 
+    if (this.unstable_shouldLoadAsEsm(modulePath)) {
+      // Node includes more info in the message
+      const error = new Error(
+        `Must use import to load ES Module: ${modulePath}`,
+      );
+
+      // @ts-expect-error: `code` is not defined
+      error.code = 'ERR_REQUIRE_ESM';
+
+      throw error;
+    }
+
     let moduleRegistry;
 
     if (options?.isInternalModule) {
       moduleRegistry = this._internalModuleRegistry;
+    } else if (this._isolatedModuleRegistry) {
+      moduleRegistry = this._isolatedModuleRegistry;
     } else {
-      if (this._isolatedModuleRegistry) {
-        moduleRegistry = this._isolatedModuleRegistry;
-      } else {
-        moduleRegistry = this._moduleRegistry;
-      }
+      moduleRegistry = this._moduleRegistry;
     }
 
     const module = moduleRegistry.get(modulePath);
@@ -984,6 +1037,7 @@ export default class Runtime {
     this._sourceMapRegistry.clear();
 
     this._fileTransforms.clear();
+    this._fileTransformsMutex.clear();
     this.jestObjectCaches.clear();
 
     this._v8CoverageResult = [];
@@ -1104,15 +1158,10 @@ export default class Runtime {
 
     let runScript: RunScriptEvalResult | null = null;
 
-    // Use this if available instead of deprecated `JestEnvironment.runScript`
-    if (typeof this._environment.getVmContext === 'function') {
-      const vmContext = this._environment.getVmContext();
+    const vmContext = this._environment.getVmContext();
 
-      if (vmContext) {
-        runScript = script.runInContext(vmContext, {filename});
-      }
-    } else {
-      runScript = this._environment.runScript<RunScriptEvalResult>(script);
+    if (vmContext) {
+      runScript = script.runInContext(vmContext, {filename});
     }
 
     if (runScript !== null) {
@@ -1182,7 +1231,50 @@ export default class Runtime {
       return source;
     }
 
-    const transformedFile = this._scriptTransformer.transform(
+    let transformedFile: TransformResult | undefined = this._fileTransforms.get(
+      filename,
+    );
+
+    if (transformedFile) {
+      return transformedFile.code;
+    }
+
+    transformedFile = this._scriptTransformer.transform(
+      filename,
+      this._getFullTransformationOptions(options),
+      source,
+    );
+
+    this._fileTransforms.set(filename, {
+      ...transformedFile,
+      wrapperLength: this.constructModuleWrapperStart().length,
+    });
+
+    if (transformedFile.sourceMapPath) {
+      this._sourceMapRegistry.set(filename, transformedFile.sourceMapPath);
+    }
+    return transformedFile.code;
+  }
+
+  private async transformFileAsync(
+    filename: string,
+    options?: InternalModuleOptions,
+  ): Promise<string> {
+    const source = this.readFile(filename);
+
+    if (options?.isInternalModule) {
+      return source;
+    }
+
+    let transformedFile: TransformResult | undefined = this._fileTransforms.get(
+      filename,
+    );
+
+    if (transformedFile) {
+      return transformedFile.code;
+    }
+
+    transformedFile = await this._scriptTransformer.transformAsync(
       filename,
       this._getFullTransformationOptions(options),
       source,
@@ -1209,6 +1301,11 @@ export default class Runtime {
         filename: scriptFilename,
         // @ts-expect-error: Experimental ESM API
         importModuleDynamically: async (specifier: string) => {
+          invariant(
+            runtimeSupportsVmModules,
+            'You need to run with a version of node that supports ES Modules in the VM API. See https://jestjs.io/docs/en/ecmascript-modules',
+          );
+
           const context = this._environment.getVmContext?.();
 
           invariant(context, 'Test environment has been torn down');
