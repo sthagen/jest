@@ -1842,3 +1842,38 @@ describe('extensionsToTreatAsEsm', () => {
     );
   });
 });
+
+describe('haste.enableSymlinks', () => {
+  it('should throw if watchman is not disabled', async () => {
+    await expect(
+      normalize({haste: {enableSymlinks: true}, rootDir: '/root/'}, {}),
+    ).rejects.toThrow('haste.enableSymlinks is incompatible with watchman');
+
+    await expect(
+      normalize(
+        {haste: {enableSymlinks: true}, rootDir: '/root/', watchman: true},
+        {},
+      ),
+    ).rejects.toThrow('haste.enableSymlinks is incompatible with watchman');
+
+    const {options} = await normalize(
+      {haste: {enableSymlinks: true}, rootDir: '/root/', watchman: false},
+      {},
+    );
+
+    expect(options.haste.enableSymlinks).toBe(true);
+    expect(options.watchman).toBe(false);
+  });
+});
+
+describe('haste.forceNodeFilesystemAPI', () => {
+  it('should pass option through', async () => {
+    const {options} = await normalize(
+      {haste: {forceNodeFilesystemAPI: true}, rootDir: '/root/'},
+      {},
+    );
+
+    expect(options.haste.forceNodeFilesystemAPI).toBe(true);
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+});

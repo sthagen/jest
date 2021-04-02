@@ -11,6 +11,7 @@
 - `[jest-config]` Add support for `preset` written in ESM ([#11200](https://github.com/facebook/jest/pull/11200))
 - `[jest-config, jest-runtime]` Support ESM for files other than `.js` and `.mjs` ([#10823](https://github.com/facebook/jest/pull/10823))
 - `[jest-config, jest-runtime]` [**BREAKING**] Use "modern" implementation as default for fake timers ([#10874](https://github.com/facebook/jest/pull/10874) & [#11197](https://github.com/facebook/jest/pull/11197))
+- `[jest-config` Allow passing `forceNodeFilesystemAPI` through to `jest-haste-map` ([#11264](https://github.com/facebook/jest/pull/11264))
 - `[jest-core]` make `TestWatcher` extend `emittery` ([#10324](https://github.com/facebook/jest/pull/10324))
 - `[jest-core]` Run failed tests interactively the same way we do with snapshots ([#10858](https://github.com/facebook/jest/pull/10858))
 - `[jest-core]` more `TestSequencer` methods can be async ([#10980](https://github.com/facebook/jest/pull/10980))
@@ -18,6 +19,7 @@
 - `[jest-environment-node]` Add AbortController to globals ([#11182](https://github.com/facebook/jest/pull/11182))
 - `[@jest/fake-timers]` Update to `@sinonjs/fake-timers` to v7 ([#11198](https://github.com/facebook/jest/pull/11198))
 - `[jest-haste-map]` Handle injected scm clocks ([#10966](https://github.com/facebook/jest/pull/10966))
+- `[jest-haste-map]` Add `enableSymlinks` configuration option to follow symlinks for test files ([#9351](https://github.com/facebook/jest/pull/9351))
 - `[jest-repl, jest-runner]` [**BREAKING**] Run transforms over environment ([#8751](https://github.com/facebook/jest/pull/8751))
 - `[jest-runner]` [**BREAKING**] set exit code to 1 if test logs after teardown ([#10728](https://github.com/facebook/jest/pull/10728))
 - `[jest-runner]` [**BREAKING**] Run transforms over `runnner` ([#8823](https://github.com/facebook/jest/pull/8823))
@@ -2270,7 +2272,7 @@ We skipped 24.2.0 because a draft was accidentally published. Please use `24.3.0
 
 ## jest 18.0.0
 
-See https://jestjs.io/blog/2016/12/15/2016-in-jest.html
+See https://jestjs.io/blog/2016/12/15/2016-in-jest
 
 - The testResultsProcessor function is now required to return the modified results.
 - Removed `pit` and `mockImpl`. Use `it` or `mockImplementation` instead.
@@ -2407,7 +2409,7 @@ See https://jestjs.io/blog/2016/12/15/2016-in-jest.html
 
 ## jest 15.0.0
 
-- See https://jestjs.io/blog/2016/09/01/jest-15.html
+- See https://jestjs.io/blog/2016/09/01/jest-15
 - Jest by default now also recognizes files ending in `.spec.js` and `.test.js` as test files.
 - Completely replaced most Jasmine matchers with new Jest matchers.
 - Rewrote Jest's CLI output for test failures and summaries.
