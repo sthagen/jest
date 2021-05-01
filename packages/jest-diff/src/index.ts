@@ -6,8 +6,11 @@
  */
 
 import chalk = require('chalk');
-import getType = require('jest-get-type');
-import prettyFormat, {plugins as prettyFormatPlugins} from 'pretty-format';
+import {getType} from 'jest-get-type';
+import {
+  format as prettyFormat,
+  plugins as prettyFormatPlugins,
+} from 'pretty-format';
 import {DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT, Diff} from './cleanupSemantic';
 import {NO_DIFF_MESSAGE, SIMILAR_MESSAGE} from './constants';
 import {diffLinesRaw, diffLinesUnified, diffLinesUnified2} from './diffLines';
