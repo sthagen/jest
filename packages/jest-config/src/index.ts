@@ -15,7 +15,11 @@ import normalize from './normalize';
 import readConfigFileAndSetRootDir from './readConfigFileAndSetRootDir';
 import resolveConfigPath from './resolveConfigPath';
 import {isJSONString, replaceRootDirInPath} from './utils';
-export {getTestEnvironment, isJSONString} from './utils';
+
+// TODO: remove export in Jest 28
+export {resolveTestEnvironment as getTestEnvironment} from 'jest-resolve';
+
+export {isJSONString} from './utils';
 export {default as normalize} from './normalize';
 export {default as deprecationEntries} from './Deprecated';
 export {replaceRootDirInPath} from './utils';
@@ -41,9 +45,7 @@ export async function readConfig(
   parentConfigDirname?: Config.Path | null,
   projectIndex: number = Infinity,
 ): Promise<ReadConfig> {
-  let rawOptions:
-    | Config.InitialOptions
-    | (() => Config.InitialOptions | Promise<Config.InitialOptions>);
+  let rawOptions: Config.InitialOptions;
   let configPath = null;
 
   if (typeof packageRootOrConfig !== 'string') {
@@ -81,10 +83,6 @@ export async function readConfig(
     // Otherwise just try to find config in the current rootDir.
     configPath = resolveConfigPath(packageRootOrConfig, process.cwd());
     rawOptions = await readConfigFileAndSetRootDir(configPath);
-  }
-
-  if (typeof rawOptions === 'function') {
-    rawOptions = await rawOptions();
   }
 
   const {options, hasDeprecationWarnings} = await normalize(

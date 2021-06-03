@@ -32,7 +32,7 @@ jobs:
         id: yarn-cache
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn2-${{ hashFiles('yarn.lock') }}
@@ -60,7 +60,7 @@ jobs:
       - name: Get yarn cache
         id: yarn-cache
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn2-${{ hashFiles('yarn.lock') }}
@@ -74,6 +74,8 @@ jobs:
         run: yarn test-types
       - name: verify TypeScript@3.8 compatibility
         run: yarn verify-old-ts
+      - name: verify Yarn PnP compatibility
+        run: yarn verify-pnp
       - name: run eslint
         run: yarn lint
       - name: run prettier
@@ -105,7 +107,7 @@ jobs:
       - name: Get yarn cache
         id: yarn-cache
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn2-${{ hashFiles('yarn.lock') }}
@@ -145,7 +147,7 @@ jobs:
       - name: Get yarn cache
         id: yarn-cache
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn2-${{ hashFiles('yarn.lock') }}
